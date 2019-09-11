@@ -463,7 +463,7 @@ def mgmt_vrf_route ():
 	"""Show management VRF routes"""
 	
 	click.echo("\nRoutes in Management VRF Routing Table:")
-	cmd = "sudo ip route show table 1001"
+	cmd = "sudo ip route show table 5000"
 	run_command(cmd)
 	return None
 
