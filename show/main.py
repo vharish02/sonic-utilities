@@ -1549,6 +1549,7 @@ def ntp(verbose):
     run_command(ntpcmd, display_cmd=verbose)
 
 
+
 #
 # 'uptime' command ("show uptime")
 #
