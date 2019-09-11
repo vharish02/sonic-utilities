@@ -1530,15 +1530,23 @@ def bgp(verbose):
 @click.option('--verbose', is_flag=True, help="Enable verbose output")
 def ntp(verbose):
     """Show NTP information"""
-    config_db = ConfigDBConnector()
-    config_db.connect()
-    entry = config_db.get_entry('MGMT_VRF_CONFIG', "vrf_global")
-    if entry and entry['mgmtVrfEnabled'] == 'true' :
-        cmd = "mgmtvrf_ntpq -p -n"
-        run_command(cmd, display_cmd=verbose)
-    else:
-        cmd = "ntpq -p -n"
-        run_command(cmd, display_cmd=verbose)
+    ntpcmd = "ntpq -p -n"
+    if ctx.invoked_subcommand is None:
+        cmd = 'sonic-cfggen -d --var-json "MGMT_VRF_CONFIG"'
+
+        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        res = p.communicate()
+        if p.returncode == 0 :
+            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            mvrf_dict = json.loads(p.stdout.read())
+
+            # if the mgmtVrfEnabled attribute is configured, check the value
+            # and print Enabled or Disabled accordingly.
+            if 'mgmtVrfEnabled' in mvrf_dict['vrf_global']:
+                if (mvrf_dict['vrf_global']['mgmtVrfEnabled'] == "true"):
+                    #ManagementVRF is enabled. Call ntpq using cgexec
+                    ntpcmd = "cgexec -g l3mdev:mgmt ntpq -p -n"
+    run_command(ntpcmd, display_cmd=verbose)
 
 
 #
