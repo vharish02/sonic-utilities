@@ -891,7 +891,7 @@ def del_vlan_member(ctx, vid, interface_name):
     db.set_entry('VLAN', vlan_name, vlan)
     db.set_entry('VLAN_MEMBER', (vlan_name, interface_name), None)
 
-def mvrf_restart_interfaces_config_ntp():
+def mvrf_restart_services():
     """Restart interfaces-config service and NTP service"""
     """
     When mvrf is enabled, eth0 should be moved to mvrf; when it is disabled,
@@ -918,7 +918,7 @@ def vrf_add_management_vrf():
         click.echo("ManagementVRF is already Enabled.")
         return None
     config_db.mod_entry('MGMT_VRF_CONFIG',"vrf_global",{"mgmtVrfEnabled": "true"})
-    mvrf_restart_interfaces_config_ntp()
+    mvrf_restart_services()
 
 def vrf_delete_management_vrf():
     """Disable management vrf"""
@@ -930,7 +930,7 @@ def vrf_delete_management_vrf():
         click.echo("ManagementVRF is already Disabled.")
         return None
     config_db.mod_entry('MGMT_VRF_CONFIG',"vrf_global",{"mgmtVrfEnabled": "false"})
-    mvrf_restart_interfaces_config_ntp()
+    mvrf_restart_services()
 
 #
 # 'vrf' group ('config vrf ...')
@@ -1191,7 +1191,7 @@ def _get_all_mgmtinterface_keys():
     config_db.connect()
     return config_db.get_table('MGMT_INTERFACE').keys()
 
-def restart_interfaces_config_ntp_config():
+def eth0_ip_change_restart_services():
     """Add or remove IP address"""
     """
     Whenever the eth0 IP address is changed, restart the "interfaces-config"
@@ -1263,7 +1263,7 @@ def add(ctx, interface_name, ip_addr, gw):
                 config_db.set_entry("MGMT_INTERFACE", (interface_name, ip_addr), {"NULL": "NULL"})
             else:
                 config_db.set_entry("MGMT_INTERFACE", (interface_name, ip_addr), {"gwaddr": gw})
-            restart_interfaces_config_ntp_config()
+            eth0_ip_change_restart_services()
 
         elif interface_name.startswith("PortChannel"):
             if VLAN_SUB_INTERFACE_SEPARATOR in interface_name:
@@ -1310,7 +1310,7 @@ def remove(ctx, interface_name, ip_addr):
                 if_table = "INTERFACE"
         elif interface_name == 'eth0':
             config_db.set_entry("MGMT_INTERFACE", (interface_name, ip_addr), None)
-            restart_interfaces_config_ntp_config()
+            eth0_ip_change_restart_services()
         elif interface_name.startswith("PortChannel"):
             if VLAN_SUB_INTERFACE_SEPARATOR in interface_name:
                 config_db.set_entry("VLAN_SUB_INTERFACE", (interface_name, ip_addr), None)
