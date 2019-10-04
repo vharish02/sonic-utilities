@@ -440,12 +440,12 @@ def is_mgmt_vrf_enabled(ctx):
 
         p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         res = p.communicate()
-        if p.returncode == 0 :
+        if p.returncode == 0:
             p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             mvrf_dict = json.loads(p.stdout.read())
 
             # if the mgmtVrfEnabled attribute is configured, check the value
-            # and print Enabled or Disabled accordingly.
+            # and return True accordingly.
             if 'mgmtVrfEnabled' in mvrf_dict['vrf_global']:
                 if (mvrf_dict['vrf_global']['mgmtVrfEnabled'] == "true"):
                     #ManagementVRF is enabled. Return True.
@@ -463,7 +463,7 @@ def mgmt_vrf(ctx,routes):
     """Show management VRF attributes"""
 
     if is_mgmt_vrf_enabled(ctx) is False:
-        click.echo("\nKVSK:ManagementVRF : Disabled")
+        click.echo("\nManagementVRF : Disabled")
         return
     else:
         if routes is None:
@@ -501,7 +501,7 @@ def address ():
     mgmt_ip_data = config_db.get_table('MGMT_INTERFACE')
     for key in natsorted(mgmt_ip_data.keys()):
         click.echo("Management IP address = {0}".format(key[1]))
-        click.echo("Management NetWork Default Gateway = {0}".format(mgmt_ip_data[key]['gwaddr']))
+        click.echo("Management Network Default Gateway = {0}".format(mgmt_ip_data[key]['gwaddr']))
 
 #
 # 'interfaces' group ("show interfaces ...")
@@ -1643,21 +1643,9 @@ def bgp(verbose):
 def ntp(ctx, verbose):
     """Show NTP information"""
     ntpcmd = "ntpq -p -n"
-    if ctx.invoked_subcommand is None:
-        cmd = 'sonic-cfggen -d --var-json "MGMT_VRF_CONFIG"'
-
-        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        res = p.communicate()
-        if p.returncode == 0 :
-            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            mvrf_dict = json.loads(p.stdout.read())
-
-            # if the mgmtVrfEnabled attribute is configured, check the value
-            # and print Enabled or Disabled accordingly.
-            if 'mgmtVrfEnabled' in mvrf_dict['vrf_global']:
-                if (mvrf_dict['vrf_global']['mgmtVrfEnabled'] == "true"):
-                    #ManagementVRF is enabled. Call ntpq using cgexec
-                    ntpcmd = "cgexec -g l3mdev:mgmt ntpq -p -n"
+    if is_mgmt_vrf_enabled(ctx) is True:
+        #ManagementVRF is enabled. Call ntpq using cgexec
+        ntpcmd = "cgexec -g l3mdev:mgmt ntpq -p -n"
     run_command(ntpcmd, display_cmd=verbose)
 
 
