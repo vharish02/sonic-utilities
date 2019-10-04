@@ -1191,7 +1191,7 @@ def _get_all_mgmtinterface_keys():
     config_db.connect()
     return config_db.get_table('MGMT_INTERFACE').keys()
 
-def eth0_ip_change_restart_services():
+def mgmt_ip_restart_services():
     """Add or remove IP address"""
     """
     Whenever the eth0 IP address is changed, restart the "interfaces-config"
@@ -1263,7 +1263,7 @@ def add(ctx, interface_name, ip_addr, gw):
                 config_db.set_entry("MGMT_INTERFACE", (interface_name, ip_addr), {"NULL": "NULL"})
             else:
                 config_db.set_entry("MGMT_INTERFACE", (interface_name, ip_addr), {"gwaddr": gw})
-            eth0_ip_change_restart_services()
+            mgmt_ip_restart_services()
 
         elif interface_name.startswith("PortChannel"):
             if VLAN_SUB_INTERFACE_SEPARATOR in interface_name:
@@ -1310,7 +1310,7 @@ def remove(ctx, interface_name, ip_addr):
                 if_table = "INTERFACE"
         elif interface_name == 'eth0':
             config_db.set_entry("MGMT_INTERFACE", (interface_name, ip_addr), None)
-            eth0_ip_change_restart_services()
+            mgmt_ip_restart_services()
         elif interface_name.startswith("PortChannel"):
             if VLAN_SUB_INTERFACE_SEPARATOR in interface_name:
                 config_db.set_entry("VLAN_SUB_INTERFACE", (interface_name, ip_addr), None)
