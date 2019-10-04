@@ -6,8 +6,6 @@ import click
 import json
 import subprocess
 import netaddr
-import logging
-import logging.handlers
 import re
 import syslog
 
@@ -892,7 +890,7 @@ def del_vlan_member(ctx, vid, interface_name):
     db.set_entry('VLAN_MEMBER', (vlan_name, interface_name), None)
 
 def mvrf_restart_services():
-    """Restart interfaces-config service and NTP service"""
+    """Restart interfaces-config service and NTP service when mvrf is changed"""
     """
     When mvrf is enabled, eth0 should be moved to mvrf; when it is disabled,
     move it back to default vrf. Restarting the "interfaces-config" service
@@ -909,7 +907,7 @@ def mvrf_restart_services():
     os.system (cmd)
 
 def vrf_add_management_vrf():
-    """Enable management vrf"""
+    """Enable management vrf in config DB"""
 
     config_db = ConfigDBConnector()
     config_db.connect()
@@ -921,7 +919,7 @@ def vrf_add_management_vrf():
     mvrf_restart_services()
 
 def vrf_delete_management_vrf():
-    """Disable management vrf"""
+    """Disable management vrf in config DB"""
 
     config_db = ConfigDBConnector()
     config_db.connect()
@@ -945,7 +943,7 @@ def vrf():
 @click.argument('vrfname', metavar='<vrfname>. Type mgmt for management VRF', required=True)
 @click.pass_context
 def vrf_add (ctx, vrfname):
-    """VRF ADD"""
+    """Create management VRF and move eth0 into it"""
     if vrfname == 'mgmt' or vrfname == 'management':
         vrf_add_management_vrf()
     else:
@@ -955,7 +953,7 @@ def vrf_add (ctx, vrfname):
 @click.argument('vrfname', metavar='<vrfname>. Type mgmt for management VRF', required=False)
 @click.pass_context
 def vrf_del (ctx, vrfname):
-    """VRF Delete"""
+    """Delete management VRF and move back eth0 to default VRF"""
     if vrfname == 'mgmt' or vrfname == 'management':
         vrf_delete_management_vrf()
     else:
@@ -1192,7 +1190,7 @@ def _get_all_mgmtinterface_keys():
     return config_db.get_table('MGMT_INTERFACE').keys()
 
 def mgmt_ip_restart_services():
-    """Add or remove IP address"""
+    """Restart the required services when mgmt inteface IP address is changed"""
     """
     Whenever the eth0 IP address is changed, restart the "interfaces-config"
     service which regenerates the /etc/network/interfaces file and restarts
