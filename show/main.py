@@ -545,6 +545,7 @@ def snmptrap (ctx):
         body.append([ver, traptable[row]['DestIp'], traptable[row]['DestPort'], traptable[row]['vrf'], traptable[row]['Community']])
     click.echo(tabulate(body, header))
 
+
 #
 # 'interfaces' group ("show interfaces ...")
 #
