@@ -504,91 +504,46 @@ def address ():
         click.echo("Management Network Default Gateway = {0}".format(mgmt_ip_data[key]['gwaddr']))
 
 #
-# 'mgmt-vrf' group ("show mgmt-vrf ...")
+# 'snmpagentaddress' group ("show snmpagentaddress ...")
 #
 
-@cli.group('mgmt-vrf', invoke_without_command=True)
+@cli.group('snmpagentaddress', invoke_without_command=True)
 @click.pass_context
-def mgmt_vrf(ctx):
-
-	"""Show management VRF attributes"""
-
-	if ctx.invoked_subcommand is None:
-		cmd = 'sonic-cfggen -d --var-json "MGMT_VRF_CONFIG"'
-		
-		p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		res = p.communicate()
-		if p.returncode == 0 :
-			p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-			mvrf_dict = json.loads(p.stdout.read())
-		
-			# if the mgmtVrfEnabled attribute is configured, check the value
-			# and print Enabled or Disabled accordingly.
-			if 'mgmtVrfEnabled' in mvrf_dict['vrf_global']:
-				if (mvrf_dict['vrf_global']['mgmtVrfEnabled'] == "true"):
-					click.echo("\nManagementVRF : Enabled")
-				else:
-					click.echo("\nManagementVRF : Disabled")
-	
-		click.echo("\nManagement VRF in Linux:")
-		cmd = "sudo ip link show type vrf"
-		run_command(cmd)
-
-@mgmt_vrf.command('interfaces')
-def mgmt_vrf_interfaces ():
-	"""Show management VRF attributes"""
-	
-	click.echo("\neth0 Interfaces in Management VRF:")
-	cmd = "sudo ifconfig eth0"
-	run_command(cmd)
-	return None
-
-@mgmt_vrf.command('route')
-def mgmt_vrf_route ():
-	"""Show management VRF routes"""
-	
-	click.echo("\nRoutes in Management VRF Routing Table:")
-	cmd = "sudo ip route show table 1001"
-	run_command(cmd)
-	return None
-
-
-@mgmt_vrf.command('addresses')
-def mgmt_vrf_addresses ():
-	"""Show management VRF addresses"""
-	
-	click.echo("\nIP Addresses for interfaces in Management VRF:")
-	cmd = "sudo ip address show mgmt"
-	run_command(cmd)
-	return None
-
-
-
-#
-# 'management_interface' group ("show management_interface ...")
-#
-
-@cli.group(cls=AliasedGroup, default_if_no_args=False)
-def management_interface():
-    """Show management interface parameters"""
-    pass
-
-# 'address' subcommand ("show management_interface address")
-@management_interface.command()
-def address ():
-    """Show IP address configured for management interface"""
-
+def snmpagentaddress (ctx):
+    """Show SNMP agent listening IP address configuration"""
     config_db = ConfigDBConnector()
     config_db.connect()
-    header = ['IFNAME', 'IP Address', 'PrefixLen',]
+    agenttable = config_db.get_table('SNMP_AGENT_ADDRESS_CONFIG')
+
+    header = ['ListenIP', 'ListenPort', 'ListenVrf']
     body = []
+    for agent in agenttable.keys():
+        body.append([agent[0], agent[1], agent[2]])
+    click.echo(tabulate(body, header))
 
-    # Fetching data from config_db for MGMT_INTERFACE
-    mgmt_ip_data = config_db.get_table('MGMT_INTERFACE')
-    for key in natsorted(mgmt_ip_data.keys()):
-        click.echo("Management IP address = {0}".format(key[1]))
-        click.echo("Management NetWork Default Gateway = {0}".format(mgmt_ip_data[key]['gwaddr']))
+#
+# 'snmptrap' group ("show snmptrap ...")
+#
 
+@cli.group('snmptrap', invoke_without_command=True)
+@click.pass_context
+def snmptrap (ctx):
+    """Show SNMP agent Trap server configuration"""
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    traptable = config_db.get_table('SNMP_TRAP_CONFIG')
+
+    header = ['Version', 'TrapReceiverIP', 'Port', 'VRF', 'Community']
+    body = []
+    for row in traptable.keys():
+        if row == "v1TrapDest":
+            ver=1
+        elif row == "v2TrapDest":
+            ver=2
+        else:
+            ver=3
+        body.append([ver, traptable[row]['DestIp'], traptable[row]['DestPort'], traptable[row]['vrf'], traptable[row]['Community']])
+    click.echo(tabulate(body, header))
 
 #
 # 'interfaces' group ("show interfaces ...")
