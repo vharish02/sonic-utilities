@@ -6,6 +6,8 @@ import click
 import json
 import subprocess
 import netaddr
+import logging
+import logging.handlers
 import re
 import syslog
 
@@ -1037,6 +1039,174 @@ def del_vlan_dhcp_relay_destination(ctx, vid, dhcp_relay_destination_ip):
             ctx.fail("Restart service dhcp_relay failed with error {}".format(e))
     else:
         ctx.fail("{} is not a DHCP relay destination for {}".format(dhcp_relay_destination_ip, vlan_name))
+
+
+def vrf_add_management_vrf():
+	"""Enable management vrf"""
+
+	config_db = ConfigDBConnector()
+	config_db.connect()
+        entry = config_db.get_entry('MGMT_VRF_CONFIG', "vrf_global")
+        if entry and entry['mgmtVrfEnabled'] == 'true' :
+	    click.echo("ManagementVRF is already Enabled.")
+	    return None
+	config_db.mod_entry('MGMT_VRF_CONFIG',"vrf_global",{"mgmtVrfEnabled": "true"})
+        cmd="service ntp stop"
+        os.system (cmd)
+        cmd="systemctl restart interfaces-config"
+        os.system (cmd)
+        cmd="service ntp start"
+        os.system (cmd)
+
+
+def vrf_delete_management_vrf():
+	"""Disable management vrf"""
+
+	config_db = ConfigDBConnector()
+	config_db.connect()
+        entry = config_db.get_entry('MGMT_VRF_CONFIG', "vrf_global")
+        if not entry or entry['mgmtVrfEnabled'] == 'false' :
+	    click.echo("ManagementVRF is already Disabled.")
+	    return None
+	config_db.mod_entry('MGMT_VRF_CONFIG',"vrf_global",{"mgmtVrfEnabled": "false"})
+        cmd="service ntp stop"
+        os.system (cmd)
+        cmd="systemctl restart interfaces-config"
+        os.system (cmd)
+        cmd="service ntp start"
+        os.system (cmd)
+
+
+#
+# 'vrf' group ('config vrf ...')
+#
+
+@config.group('vrf')
+def vrf():
+    """VRF-related configuration tasks"""
+    pass
+
+
+@vrf.command('add')
+@click.argument('vrfname', metavar='<vrfname>. Type mgmt for management VRF', required=True)
+@click.pass_context
+def vrf_add (ctx, vrfname):
+    """VRF ADD"""
+    if vrfname == 'mgmt' or vrfname == 'management':
+        vrf_add_management_vrf()
+    else:
+        click.echo("Creation of data vrf={} is not yet supported".format(vrfname))
+
+
+@vrf.command('del')
+@click.argument('vrfname', metavar='<vrfname>. Type mgmt for management VRF', required=False)
+@click.pass_context
+def vrf_del (ctx, vrfname):
+    """VRF Delete"""
+    if vrfname == 'mgmt' or vrfname == 'management':
+        vrf_delete_management_vrf()
+    else:
+        click.echo("Deletion of data vrf={} is not yet supported".format(vrfname))
+
+
+@config.command('clear_mgmt')
+@click.pass_context
+def clear_mgmt(ctx):
+    MGMT_TABLE_NAMES = [
+            'MGMT_INTERFACE',
+            'MGMT_VRF_CONFIG']
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    for mgmt_table in MGMT_TABLE_NAMES:
+        config_db.delete_table(mgmt_table)
+
+@config.group()
+def snmpagentaddress():
+    """SNMP agentaddress Related Task"""
+    pass
+
+@snmpagentaddress.command('add')
+@click.argument('agentip', metavar='<SNMP AGENT IP Address>', required=True)
+@click.argument('vrf', metavar='<VRF name mgmt/default/data>', required=False)
+@click.pass_context
+
+def add_snmp_agent_address(ctx, agentip, vrf):
+    """Add the SNMP agent IP and VRF configuration"""
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    if vrf:
+        entry = config_db.get_entry('MGMT_VRF_CONFIG', "vrf_global")
+        if entry == {}:
+            click.echo('Cannot set SNMP Agent ip address using when management VRF is not yet configured.')
+            return
+        if entry['mgmtVrfEnabled'] == "false" :
+            click.echo('Cannot set SNMP Agent ip address using when management VRF is not yet enabled.')
+            return
+
+    config_db.set_entry('SNMP_AGENT_ADDRESS_CONFIG', (agentip, vrf), {})
+    cmd="systemctl restart snmp"
+    os.system (cmd)
+
+@snmpagentaddress.command('del')
+@click.argument('agentip', metavar='<SNMP AGENT IP Address>', required=True)
+@click.argument('vrf', metavar='<VRF name mgmt/default/data>', required=False)
+@click.pass_context
+
+def del_snmp_agent_address(ctx, agentip, vrf):
+    """Del the SNMP agent IP and VRF configuration"""
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    if vrf:
+        entry = config_db.get_entry('MGMT_VRF_CONFIG', "vrf_global")
+        if entry == {}:
+            click.echo('Cannot set SNMP Agent ip address using when management VRF is not yet configured.')
+            return
+        if entry['mgmtVrfEnabled'] == "false" :
+            click.echo('Cannot set SNMP Agent ip address using when management VRF is not yet enabled.')
+            return
+
+    config_db.get_entry('SNMP_AGENT_ADDRESS_CONFIG', (agentip, vrf))
+    config_db.set_entry('SNMP_AGENT_ADDRESS_CONFIG', (agentip, vrf), None)
+    cmd="systemctl restart snmp"
+    os.system (cmd)
+
+@config.group()
+def snmptrap():
+    """SNMP Traps Related Task"""
+    pass
+
+@snmptrap.command('modify')
+@click.argument('ver', metavar='<SNMP Version>', type=click.Choice(['1', '2', '3']), required=True)
+@click.argument('serverip', metavar='<SNMP TRAP SERVER IP Address>', required=True)
+@click.argument('vrf', metavar='<VRF name mgmt/default/data>', required=False)
+@click.argument('trapport', metavar='<SNMP Trap Server port, default 162>', required=False)
+@click.pass_context
+def modify_snmptrap_server(ctx, ver, serverip, vrf, trapport):
+    """Add the SNMP Trap server configuration"""
+    if not trapport:
+        trapport = 162
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    if vrf and vrf == "mgmt":
+        entry = config_db.get_entry('MGMT_VRF_CONFIG', "vrf_global")
+        if entry == {}:
+            click.echo('Cannot set SNMPTrap server using --use-mgmt-vrf when management VRF is not yet configured.')
+            return
+        if entry['mgmtVrfEnabled'] == "false" :
+            click.echo('Cannot set SNMPTrap server using --use-mgmt-vrf when management VRF is not yet enabled.')
+            return
+
+    if ver == "1":
+        config_db.mod_entry('SNMP_TRAP_CONFIG',"v1TrapDest",{"DestIp": serverip, "DestPort": trapport, "vrf": vrf})
+    elif ver == "2":
+        config_db.mod_entry('SNMP_TRAP_CONFIG',"v2TrapDest",{"DestIp": serverip, "DestPort": trapport, "vrf": vrf})
+    else:
+        config_db.mod_entry('SNMP_TRAP_CONFIG',"v3TrapDest",{"DestIp": serverip, "DestPort": trapport, "vrf": vrf})
+    cmd="systemctl restart snmp"
+    os.system (cmd)
 
 #
 # 'bgp' group ('config bgp ...')
